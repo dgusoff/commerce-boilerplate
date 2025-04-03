@@ -1,14 +1,62 @@
-name: Build
-on: [push]
 
+on:
+  workflow_call:
+    inputs:
+      eid:
+        required: false
+        type: string
+      oid:
+        required: false
+        type: string
+      scpid:
+        required: false
+        type: string
+      app-name:
+        required: false
+        type: string
+        default: ${{ github.repository }}
+      trx-host:
+        required: false
+        type: string
+        default: 'https://app.threatrix.io'
+      tags:
+        required: false
+        type: string
+    secrets:
+      TOKEN:
+        required: true
+      THREATRIX_SERVER_API_KEY:
+        required: true
+      THREATRIX_EID:
+        required: false
+      THREATRIX_OID:
+        required: false
+      THREATRIX_SCP_ID:
+        required: false
 jobs:
-  build:
+  scan-repository:
+    name: Scan repository
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-    - run: npm ci
-    - run: npm run lint
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref != '' && github.head_ref || github.ref_name }}
+      - name: Run scan with threat-agent
+        uses: threatrix/threat-agent-scan@master
+        with:
+          eid: ${{ env.TRX_EID }}
+          oid: ${{ env.TRX_OID }}
+          scpid: ${{ env.SCP_ID != '' && env.SCP_ID || 'UNDEFINED' }}
+          server-url: ${{ inputs.trx-host }}
+          scm-token: ${{ secrets.TOKEN }}
+          api-token: ${{ secrets.THREATRIX_SERVER_API_KEY }}
+          app-name: ${{ inputs.app-name }}
+          tags: ${{ inputs.tags }}
+          branch: ${{ github.head_ref != '' && github.head_ref || github.ref_name }}
+          pr-num: ${{ github.event.pull_request.number != '' && github.event.pull_request.number || 'UNDEFINED' }}
+    env:
+      TRX_EID: ${{ inputs.eid != '' && inputs.eid || secrets.THREATRIX_EID }}
+      TRX_OID: ${{ inputs.oid != '' && inputs.oid || secrets.THREATRIX_OID }}
+      SCP_ID: ${{ inputs.scpid != '' && inputs.scpid || secrets.THREATRIX_SCP_ID }}
+
